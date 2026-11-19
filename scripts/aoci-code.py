@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Update bucket/aoci.json from the aoci-code GitHub releases.
+"""Update bucket/aoci-code.json from the aoci-code GitHub releases.
 
 Standard library only, no Windows/Scoop dependency, so it runs on any Linux runner.
 
-aoci ships real downloadable artifacts (per-arch zip + SHA256SUMS), so the update is:
+aoci-code ships real downloadable artifacts (per-arch zip + SHA256SUMS), so the update is:
 detect the newest release tag -> expand `autoupdate.url` for each architecture ->
 take the sha256 from SHA256SUMS (or compute it) -> rewrite version, url and hash.
 
 Usage:
-    python3 scripts/aoci.py                 # check and write
-    python3 scripts/aoci.py --dry-run       # report only
-    python3 scripts/aoci.py --token $GH_TOKEN
+    python3 scripts/aoci-code.py                 # check and write
+    python3 scripts/aoci-code.py --dry-run       # report only
+    python3 scripts/aoci-code.py --token $GH_TOKEN
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ import urllib.error
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MANIFEST = os.path.join(ROOT, "bucket", "aoci.json")
+MANIFEST = os.path.join(ROOT, "bucket", "aoci-code.json")
 REPO = "https://github.com/aoci-spec/aoci-code"
 UA = "scoop-third-party-updater/1.0 (+https://gitcode.com/NamaeResu/scoop-third-party)"
 TOKEN = ""
@@ -183,13 +183,13 @@ def update(dry_run: bool) -> bool:
     current = manifest.get("version", "0")
     latest = detect()
     if not is_newer(latest, current):
-        print(f"  aoci: {current} (up to date)")
+        print(f"  aoci-code: {current} (up to date)")
         return False
 
-    print(f"  aoci: {current} -> {latest}")
+    print(f"  aoci-code: {current} -> {latest}")
     auto = manifest.get("autoupdate")
     if not auto:
-        raise SystemExit("aoci: no autoupdate block, cannot rewrite url/hash")
+        raise SystemExit("aoci-code: no autoupdate block, cannot rewrite url/hash")
 
     subs = substitutions(latest)
 
@@ -200,7 +200,7 @@ def update(dry_run: bool) -> bool:
         if new_hash is None:
             new_hash = resolve_hash(auto.get("hash"), new_url, subs)
         if new_hash is None:
-            raise SystemExit(f"aoci: could not determine hash for {new_url}")
+            raise SystemExit(f"aoci-code: could not determine hash for {new_url}")
         return new_url, new_hash
 
     if "architecture" in auto:
@@ -249,7 +249,7 @@ def main() -> int:
     try:
         update(args.dry_run)
     except urllib.error.URLError as exc:
-        print(f"  aoci: network error: {exc}", file=sys.stderr)
+        print(f"  aoci-code: network error: {exc}", file=sys.stderr)
         return 1
     return 0
 

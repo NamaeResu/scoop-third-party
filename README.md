@@ -25,7 +25,7 @@ scripts/Manifest.template.json
 
 不同软件的上游差别太大，用一套通用规则去套只会把某个包的策略强加给所有包：
 
-- `aoci` 发真实产物（按架构的 zip + `SHA256SUMS`），更新时要展开 `autoupdate.url`
+- `aoci-code` 发真实产物（按架构的 zip + `SHA256SUMS`），更新时要展开 `autoupdate.url`
   并按文件名从校验文件里取 sha256。
 - `flutter-ohos-341` 没有可下载产物（installer 把 SDK clone 到 persist 目录再
   checkout tag），更新只需要改 `version`，没有 url/hash 可算；而且上游同一行用
@@ -46,10 +46,10 @@ scripts/Manifest.template.json
 ## 手动更新
 
 ```bash
-python3 scripts/aoci.py              # 只更新 aoci
-python3 scripts/aoci.py --dry-run    # 只报告
-python3 scripts/flutter-ohos-341.py  # 只更新 flutter-ohos-341
-GH_TOKEN=xxx python3 scripts/aoci.py # 带 token，避免 GitHub API 限流
+python3 scripts/aoci-code.py              # 只更新 aoci-code
+python3 scripts/aoci-code.py --dry-run    # 只报告
+python3 scripts/flutter-ohos-341.py       # 只更新 flutter-ohos-341
+GH_TOKEN=xxx python3 scripts/aoci-code.py # 带 token，避免 GitHub API 限流
 ```
 
 ## 自动更新（GitCode 流水线）
@@ -63,7 +63,7 @@ GitCode 托管 runner 只有 Linux（`ubuntu-latest` / `euler-latest`），所�
 不依赖 Scoop/Windows。runner 预装 Python 3，无需额外安装。
 
 > 可选：在仓库 Secrets 里加一个 `GH_TOKEN`（GitHub PAT），可把 GitHub API 限流
-> 从 60 次/小时提到 5000 次/小时。不加也能跑，`aoci.py` 会自动回退到 `releases.atom`。
+> 从 60 次/小时提到 5000 次/小时。不加也能跑，`aoci-code.py` 会自动回退到 `releases.atom`。
 
 ## 新增一个软件
 

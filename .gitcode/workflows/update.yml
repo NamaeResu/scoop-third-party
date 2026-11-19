@@ -2,7 +2,7 @@
 #
 # GitCode's hosted runners are Linux only (ubuntu-latest / euler-latest), so this
 # runs the per-app updaters in scripts/ (stdlib-only Python, no Scoop/Windows needed).
-# Every *.py there owns exactly one manifest: scripts/aoci.py -> bucket/aoci.json,
+# Every *.py there owns exactly one manifest: scripts/aoci-code.py -> bucket/aoci-code.json,
 # scripts/flutter-ohos-341.py -> bucket/flutter-ohos-341.json.
 name: update-manifests
 
@@ -16,7 +16,7 @@ permissions:
 
 env:
   # Optional: raises the GitHub API rate limit from 60/h to 5000/h.
-  # Add a repo secret named GH_TOKEN for it; without it the aoci updater still
+  # Add a repo secret named GH_TOKEN for it; without it the aoci-code updater still
   # works by falling back to the releases.atom feed.
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
