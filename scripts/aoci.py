@@ -1,24 +1,16 @@
 #!/usr/bin/env python3
-"""Detect upstream versions for every manifest in ./bucket and rewrite version/url/hash.
+"""Update bucket/aoci.json from the aoci-code GitHub releases.
 
 Standard library only, no Windows/Scoop dependency, so it runs on any Linux runner.
-Reads the same `checkver` / `autoupdate` blocks a normal Scoop manifest uses, so
-manifests stay valid for `scoop install` and for `scoop update`.
 
-Supported checkver forms:
-    {"github": "https://github.com/<owner>/<repo>"}     GitHub API, falls back to the atom feed
-    {"url": "...", "regex": "..."}                       plain page + regex (group 1 = version)
-
-Supported autoupdate forms:
-    {"architecture": {"64bit": {"url": "..."}}, "hash": {"url": "$baseurl/SHA256SUMS"}}
-    {"url": "...", "hash": {"url": "...", "regex": "..."}}
-    missing/plain hash  -> artifact is downloaded and its sha256 computed
+aoci ships real downloadable artifacts (per-arch zip + SHA256SUMS), so the update is:
+detect the newest release tag -> expand `autoupdate.url` for each architecture ->
+take the sha256 from SHA256SUMS (or compute it) -> rewrite version, url and hash.
 
 Usage:
-    python3 scripts/update.py                 # check and write
-    python3 scripts/update.py --dry-run       # report only
-    python3 scripts/update.py --app aoci      # one manifest
-    python3 scripts/update.py --token $GH_TOKEN
+    python3 scripts/aoci.py                 # check and write
+    python3 scripts/aoci.py --dry-run       # report only
+    python3 scripts/aoci.py --token $GH_TOKEN
 """
 from __future__ import annotations
 
@@ -32,7 +24,8 @@ import urllib.error
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BUCKET = os.path.join(ROOT, "bucket")
+MANIFEST = os.path.join(ROOT, "bucket", "aoci.json")
+REPO = "https://github.com/aoci-spec/aoci-code"
 UA = "scoop-third-party-updater/1.0 (+https://gitcode.com/NamaeResu/scoop-third-party)"
 TOKEN = ""
 
@@ -42,7 +35,6 @@ def fetch(url: str, timeout: int = 60) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     if TOKEN and "api.github.com" in url:
         req.add_header("Authorization", "Bearer " + TOKEN)
-    if TOKEN and "api.github.com" in url:
         req.add_header("Accept", "application/vnd.github+json")
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read()
@@ -80,12 +72,11 @@ def is_newer(candidate: str, current: str) -> bool:
 
 
 # ------------------------------------------------------------------- detection
-def detect_github(repo: str):
-    """Latest release tag from the GitHub API; falls back to the atom feed (includes prereleases)."""
-    repo = repo.rstrip("/")
-    m = re.search(r"github\.com/([^/]+)/([^/#?]+)", repo)
+def detect() -> str:
+    """Latest release tag from the GitHub API; falls back to the atom feed."""
+    m = re.search(r"github\.com/([^/]+)/([^/#?]+)", REPO)
     if not m:
-        raise SystemExit(f"cannot parse github repo: {repo}")
+        raise SystemExit(f"cannot parse github repo: {REPO}")
     owner, name = m.group(1), m.group(2).removesuffix(".git")
 
     api = f"https://api.github.com/repos/{owner}/{name}/releases?per_page=10"
@@ -104,40 +95,6 @@ def detect_github(repo: str):
     if not tags:
         raise SystemExit(f"no release tags found for {owner}/{name}")
     return tags[0].lstrip("vV")
-
-
-def detect(app: str, manifest: dict) -> str | None:
-    cv = manifest.get("checkver")
-    if isinstance(cv, str):
-        cv = {"github": cv}
-    if not cv:
-        print(f"  {app}: no checkver, skipped")
-        return None
-
-    if cv.get("github"):
-        version = detect_github(cv["github"])
-    elif cv.get("url"):
-        text = fetch_text(cv["url"])
-        pattern = cv.get("regex")
-        if not pattern:
-            raise SystemExit(f"{app}: checkver.url without regex")
-        m = re.search(pattern, text, re.MULTILINE)
-        if not m:
-            print(f"  {app}: regex did not match {cv['url']}")
-            return None
-        version = m.group(1)
-    else:
-        raise SystemExit(f"{app}: checkver needs 'github' or 'url'+'regex'")
-
-    # {"replace": {"^v": ""}} or {"replace": ["^v"]} — same shapes Scoop accepts
-    replace = cv.get("replace")
-    if isinstance(replace, dict):
-        for pattern, repl in replace.items():
-            version = re.sub(pattern, repl, version)
-    elif isinstance(replace, list):
-        for pattern in replace:
-            version = re.sub(pattern, "", version)
-    return version.strip()
 
 
 # ------------------------------------------------------------------ substitutes
@@ -218,24 +175,21 @@ def resolve_hash(spec, artifact_url: str, subs: dict[str, str] | None = None) ->
 
 
 # ------------------------------------------------------------------------ main
-def update_one(path: str, dry_run: bool) -> tuple[str, str, str] | None:
-    app = os.path.splitext(os.path.basename(path))[0]
+def update(dry_run: bool) -> bool:
+    path = MANIFEST
     with open(path, encoding="utf-8") as fh:
         manifest = json.load(fh)
 
     current = manifest.get("version", "0")
-    latest = detect(app, manifest)
-    if not latest:
-        return None
+    latest = detect()
     if not is_newer(latest, current):
-        print(f"  {app}: {current} (up to date)")
-        return None
+        print(f"  aoci: {current} (up to date)")
+        return False
 
-    print(f"  {app}: {current} -> {latest}")
+    print(f"  aoci: {current} -> {latest}")
     auto = manifest.get("autoupdate")
     if not auto:
-        print(f"    no autoupdate block, cannot rewrite url/hash", file=sys.stderr)
-        return None
+        raise SystemExit("aoci: no autoupdate block, cannot rewrite url/hash")
 
     subs = substitutions(latest)
 
@@ -246,7 +200,7 @@ def update_one(path: str, dry_run: bool) -> tuple[str, str, str] | None:
         if new_hash is None:
             new_hash = resolve_hash(auto.get("hash"), new_url, subs)
         if new_hash is None:
-            raise SystemExit(f"{app}: could not determine hash for {new_url}")
+            raise SystemExit(f"aoci: could not determine hash for {new_url}")
         return new_url, new_hash
 
     if "architecture" in auto:
@@ -272,56 +226,31 @@ def update_one(path: str, dry_run: bool) -> tuple[str, str, str] | None:
 
     if dry_run:
         print(f"    (dry-run) would write {path}")
-        return (app, current, latest)
+        return True
 
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(manifest, fh, indent=4, ensure_ascii=False)
         fh.write("\n")
     print(f"    wrote {path}")
-    return (app, current, latest)
+    return True
 
 
 def main() -> int:
     global TOKEN
     ap = argparse.ArgumentParser()
-    ap.add_argument("--app", default="*", help="only this manifest (file stem)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--token", default=os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN") or "")
     args = ap.parse_args()
     TOKEN = args.token
 
-    if not os.path.isdir(BUCKET):
-        print(f"bucket directory not found: {BUCKET}", file=sys.stderr)
+    if not os.path.isfile(MANIFEST):
+        print(f"manifest not found: {MANIFEST}", file=sys.stderr)
         return 1
-
-    names = sorted(f for f in os.listdir(BUCKET) if f.endswith(".json"))
-    if args.app != "*":
-        wanted = {args.app if args.app.endswith(".json") else args.app + ".json"}
-        names = [n for n in names if n in wanted]
-        if not names:
-            print(f"no manifest named {args.app} in {BUCKET}", file=sys.stderr)
-            return 1
-
-    print(f"checking {len(names)} manifest(s) in {BUCKET}")
-    changed = []
-    for name in names:
-        if name.startswith("."):
-            continue
-        try:
-            result = update_one(os.path.join(BUCKET, name), args.dry_run)
-        except urllib.error.URLError as exc:
-            print(f"  {name}: network error: {exc}", file=sys.stderr)
-            continue
-        if result:
-            changed.append(result)
-
-    if not changed:
-        print("no updates found")
-        return 0
-
-    print(f"\n{len(changed)} update(s):")
-    for app, old, new in changed:
-        print(f"  {app}: {old} -> {new}")
+    try:
+        update(args.dry_run)
+    except urllib.error.URLError as exc:
+        print(f"  aoci: network error: {exc}", file=sys.stderr)
+        return 1
     return 0
 
 

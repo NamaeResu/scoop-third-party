@@ -1,0 +1,68 @@
+{
+    "##": "The SDK is cloned once into the persist dir; installing another version only fetches that tag and checks it out. There is no usable download artifact, so 'url' is a placeholder and 'hash' is intentionally absent.",
+    "version": "3.41.9+ohos-1.0.2",
+    "description": "Flutter SDK with OpenHarmony/HarmonyOS support (CPF-Flutter fork), 3.41 maintenance line",
+    "homepage": "https://gitcode.com/CPF-Flutter/flutter_flutter",
+    "license": "BSD-3-Clause",
+    "depends": "git",
+    "url": "https://raw.gitcode.com/CPF-Flutter/flutter_flutter/raw/master/README.md",
+    "installer": {
+        "script": [
+            "$repo = 'https://gitcode.com/CPF-Flutter/flutter_flutter.git'",
+            "$sdk = Join-Path $persist_dir 'sdk'",
+            "New-Item -ItemType Directory -Force -Path (Join-Path $dir 'bin') | Out-Null",
+            "if (Test-Path (Join-Path $sdk '.git')) {",
+            "    Write-Host \"Reusing the clone at $sdk; switching it to tag '$version' ...\"",
+            "    $refspec = '+refs/tags/' + $version + ':refs/tags/' + $version",
+            "    git -C $sdk fetch --depth 1 origin $refspec",
+            "    if ($LASTEXITCODE -eq 0) { git -C $sdk checkout -f --detach $version }",
+            "    if ($LASTEXITCODE -ne 0) {",
+            "        Write-Host 'Switching the existing clone failed; replacing it with a fresh shallow clone.' -ForegroundColor Yellow",
+            "        Remove-Item $sdk -Recurse -Force",
+            "    }",
+            "}",
+            "if (!(Test-Path (Join-Path $sdk 'bin\\flutter.bat'))) {",
+            "    Write-Host \"Cloning $repo at tag '$version' (depth 1) ...\"",
+            "    New-Item -ItemType Directory -Force -Path (Split-Path $sdk) | Out-Null",
+            "    git clone --depth 1 --branch $version $repo $sdk",
+            "    if ($LASTEXITCODE -ne 0) { abort \"git clone failed for tag '$version'\" }",
+            "}",
+            "if (!(Test-Path (Join-Path $sdk 'bin\\flutter.bat'))) { abort \"bin\\flutter.bat missing under $sdk\" }",
+            "@('@echo off', ('call \"{0}\\bin\\flutter.bat\" %*' -f $sdk), 'exit /b %errorlevel%') | Set-Content -Path (Join-Path $dir 'bin\\flutter.cmd') -Encoding ASCII",
+            "@('@echo off', ('call \"{0}\\bin\\dart.bat\" %*' -f $sdk), 'exit /b %errorlevel%') | Set-Content -Path (Join-Path $dir 'bin\\dart.cmd') -Encoding ASCII"
+        ]
+    },
+    "bin": [
+        [
+            "bin\\flutter.cmd",
+            "flutter341"
+        ],
+        [
+            "bin\\dart.cmd",
+            "dart341"
+        ],
+        [
+            "bin\\flutter.cmd",
+            "flutter"
+        ],
+        [
+            "bin\\dart.cmd",
+            "dart"
+        ]
+    ],
+    "notes": [
+        "The SDK lives once in ~/scoop/persist/flutter-ohos-341/sdk and is shared by every version of this package.",
+        "Installing or updating a version only fetches that tag (depth 1) and checks it out - no second clone, no duplicate SDK.",
+        "Because the checkout is shared, two versions cannot be live at once: the working tree follows whichever was installed last. 'flutter341 --version' reports the real one.",
+        "bin/cache artifacts survive a switch; Flutter re-downloads them when the engine revision differs.",
+        "scoop uninstall keeps the SDK; 'scoop uninstall flutter-ohos-341 --purge' deletes it.",
+        "Do NOT run 'flutter upgrade' - it pulls upstream Flutter and breaks the OH adapter."
+    ],
+    "checkver": {
+        "script": "$r = Invoke-RestMethod -UseBasicParsing 'https://gitcode.com/api/v5/repos/CPF-Flutter/flutter_flutter/releases?per_page=100'; ($r | Where-Object { $_.tag_name -match '^3\\.41\\.' -and -not $_.prerelease -and $_.tag_name -notmatch '(?i)(alpha|beta|rc|canary|preview|pre|dev)' } | Sort-Object created_at)[-1].tag_name",
+        "regex": "(3\\.41\\.\\d+[+-]ohos-\\d+(?:\\.\\d+){2,3})"
+    },
+    "autoupdate": {
+        "note": "Only the version changes: installer.script checks out that tag in the shared persist clone, and the download URL is a fixed placeholder. The repo's scripts/flutter-ohos-341.py applies the same rule (newest created_at, prereleases excluded) because the 3.41 line is tagged in two shapes across separate branches."
+    }
+}
