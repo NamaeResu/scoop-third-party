@@ -22,6 +22,9 @@
             "64bit": {
                 "url": ""
             }
+        },
+        "hash": {
+            "url": "$baseurl/SHA256SUMS"
         }
     }
 }

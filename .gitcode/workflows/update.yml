@@ -1,15 +1,22 @@
-# 定时探测上游新版本并提交 manifest 变更。
+# Scheduled manifest update.
 #
-# 注意：Scoop 的 checkver 依赖 Windows 上的 Scoop 本体，因此本流水线必须跑在
-# Windows runner 上。GitCode 默认的 EulerOS runner 跑不了，需要在「流水线 → 运行器」
-# 里注册一台 Windows runner 并给仓库打上 windows 标签；没有的话请用 README 里的
-# 计划任务方案（schtasks），效果完全相同。
+# GitCode's hosted runners are Linux only (ubuntu-latest / euler-latest), so this
+# runs scripts/update.py (stdlib-only Python, no Scoop/Windows needed).
 name: update-manifests
 
 on:
   schedule:
-    - cron: '0 4 * * *' # 每天 UTC 04:00
+    - cron: '0 4 * * *' # daily 04:00 UTC
   workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # Optional: raises the GitHub API rate limit from 60/h to 5000/h.
+  # Add a repo secret named GH_TOKEN for it; without it the updater still works
+  # by falling back to the releases.atom feed.
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
 stages:
   update:
@@ -17,26 +24,31 @@ stages:
     jobs:
       JOB_update:
         name: update
-        runs-on: [self-hosted, windows]
+        runs-on: default
         steps:
           - name: Checkout
             identifier: checkout
             uses: checkout
 
-          - name: Run checkver
-            identifier: run_checkver
+          - name: Update manifests
+            identifier: run_update
             run: |
               cd repo_workspace
-              pwsh -NoProfile -File scripts/update.ps1 -Commit
+              python3 scripts/update.py
 
-          - name: Push changes
-            identifier: push
-            if: "${{ steps.run_checkver.outcome == 'success' }}"
+          - name: Commit and push
+            identifier: commit_push
             run: |
               cd repo_workspace
-              git config user.name "gitcode-actions"
-              git config user.email "actions@gitcode.com"
-              git push origin HEAD
+              if git diff --quiet -- bucket; then
+                echo "no changes"
+                exit 0
+              fi
+              git config user.name "gitcode-ci"
+              git config user.email "ci@gitcode.com"
+              git add bucket
+              git commit -m "chore: auto-update manifests"
+              git push origin HEAD:main
         if: "${{ default() }}"
     pre:
       - type: auto
