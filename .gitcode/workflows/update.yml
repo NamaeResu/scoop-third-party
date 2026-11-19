@@ -1,0 +1,69 @@
+# Scheduled manifest update.
+#
+# GitCode's hosted runners are Linux only (ubuntu-latest / euler-latest), so this
+# runs the per-app updaters in scripts/ (stdlib-only Python, no Scoop/Windows needed).
+# Every *.py there owns exactly one manifest: scripts/aoci-code.py -> bucket/aoci-code.json,
+# scripts/flutter-ohos-341.py -> bucket/flutter-ohos-341.json.
+#
+# The scripts themselves are platform-agnostic: no environment variables, no CI
+# awareness. This file only checks out, runs them, and commits what they wrote.
+name: update-manifests
+
+on:
+  schedule:
+    - cron: '0 4 * * *' # daily 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+stages:
+  update:
+    name: checkver
+    jobs:
+      JOB_update:
+        name: update
+        runs-on: default
+        steps:
+          - name: Checkout
+            identifier: checkout
+            uses: checkout
+
+          - name: Update manifests
+            identifier: run_update
+            run: |
+              cd repo_workspace
+              : > update-failures.txt
+              for script in scripts/*.py; do
+                echo "== $script"
+                python3 "$script" || echo "$script" >> update-failures.txt
+              done
+
+          - name: Commit and push
+            identifier: commit_push
+            run: |
+              cd repo_workspace
+              if git diff --quiet -- bucket; then
+                echo "no changes"
+              else
+                git config user.name "gitcode-ci"
+                git config user.email "ci@gitcode.com"
+                git add bucket
+                git commit -m "chore: auto-update manifests"
+                git push origin HEAD:main
+              fi
+
+          - name: Fail on updater errors
+            identifier: fail_on_errors
+            run: |
+              cd repo_workspace
+              if [ -s update-failures.txt ]; then
+                echo "these updaters failed:" >&2
+                cat update-failures.txt >&2
+                exit 1
+              fi
+              echo "all updaters ok"
+        if: "${{ default() }}"
+    pre:
+      - type: auto
+    fail-fast: true

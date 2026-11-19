@@ -35,7 +35,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(ROOT, "bucket", "flutter-ohos-341.json")
 API = "https://gitcode.com/api/v5/repos/CPF-Flutter/flutter_flutter/releases?per_page=100"
-UA = "scoop-third-party-updater/1.0 (+https://gitcode.com/NamaeResu/scoop-third-party)"
+UA = "scoop-third-party-updater/1.0"
 LINE = "3.41"
 PRERELEASE = re.compile(r"(?i)(?:^|[-._+])(?:alpha|beta|rc|canary|pre|preview|dev|nightly|snapshot)\d*(?:$|[-._+])")
 BASE = re.compile(r"^v?(\d+\.\d+(?:\.\d+)?)")

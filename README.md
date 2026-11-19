@@ -3,12 +3,15 @@
 一个 Scoop bucket，收录官方 bucket（main / extras / versions）之外的第三方软件，
 并由脚本持续探测上游新版本、自动更新 manifest。
 
-仓库地址：<https://gitcode.com/NamaeResu/scoop-third-party>
+仓库地址：
+
+- GitHub：<https://github.com/NamaeResu/scoop-third-party>
+- GitCode：<https://gitcode.com/NamaeResu/scoop-third-party>
 
 ## 使用
 
 ```powershell
-scoop bucket add third-party https://gitcode.com/NamaeResu/scoop-third-party
+scoop bucket add third-party https://github.com/NamaeResu/scoop-third-party
 scoop install third-party/<app>
 ```
 
@@ -18,7 +21,8 @@ scoop install third-party/<app>
 bucket/                        # manifest 放这里，一个软件一个 .json
 scripts/<app>.py               # 一个软件一个更新脚本，只负责自己那个 manifest
 scripts/Manifest.template.json
-.gitcode/workflows/update.yml  # GitCode 流水线，每天 UTC 04:00 跑 scripts/*.py
+.github/workflows/update.yml   # GitHub Actions，每天 UTC 04:00 跑 scripts/*.py
+.gitcode/workflows/update.yml  # GitCode 流水线，同上（两份等价，脚本平台无关）
 ```
 
 ## 为什么一个软件一个脚本
@@ -49,21 +53,24 @@ scripts/Manifest.template.json
 python3 scripts/aoci-code.py              # 只更新 aoci-code
 python3 scripts/aoci-code.py --dry-run    # 只报告
 python3 scripts/flutter-ohos-341.py       # 只更新 flutter-ohos-341
-GH_TOKEN=xxx python3 scripts/aoci-code.py # 带 token，避免 GitHub API 限流
+python3 scripts/aoci-code.py --token xxx  # 带 token，避免 GitHub API 限流
 ```
 
-## 自动更新（GitCode 流水线）
+脚本不读任何环境变量、不认识任何 CI 平台，只依赖 Linux + Python 3。
+需要 GitHub API 提速时把 PAT 用 `--token` 显式传进来；不传就走匿名 API，
+超限后回退到 `releases.atom`。
 
-`.gitcode/workflows/update.yml` 每天 UTC 04:00 遍历 `scripts/*.py` 逐个执行，
-有变更就 `commit + push` 到 `main`。也可以手动触发（`workflow_dispatch`）。
+## 自动更新（流水线）
 
-某个脚本失败不会中断其他脚本，失败列表在最后一步统一报错，流水线标红。
+仓库里有两份等价配置，谁跑都一样（脚本本身不含平台逻辑）：
 
-GitCode 托管 runner 只有 Linux（`ubuntu-latest` / `euler-latest`），所以脚本刻意
-不依赖 Scoop/Windows。runner 预装 Python 3，无需额外安装。
+- `.github/workflows/update.yml` — GitHub Actions，每天 UTC 04:00
+- `.gitcode/workflows/update.yml` — GitCode 流水线，每天 UTC 04:00
 
-> 可选：在仓库 Secrets 里加一个 `GH_TOKEN`（GitHub PAT），可把 GitHub API 限流
-> 从 60 次/小时提到 5000 次/小时。不加也能跑，`aoci-code.py` 会自动回退到 `releases.atom`。
+两者都遍历 `scripts/*.py` 逐个执行，有变更就 `commit + push` 到 `main`，
+也支持手动触发。某个脚本失败不中断其他脚本，失败列表在最后一步统一报错。
+
+脚本刻意不依赖 Scoop/Windows，runner 预装 Python 3 即可，无需额外安装。
 
 ## 新增一个软件
 

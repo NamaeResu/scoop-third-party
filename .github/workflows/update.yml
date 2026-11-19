@@ -14,13 +14,6 @@ on:
 permissions:
   contents: write
 
-env:
-  # The runners provide GITHUB_TOKEN; the updaters fall back to it for GitHub API
-  # calls (60 req/h anonymous -> 1000 req/h with the token).
-  # Add a repo secret named GH_TOKEN to use a personal token instead.
-  GH_TOKEN: ${{ secrets.GH_TOKEN }}
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
 jobs:
   update:
     name: update

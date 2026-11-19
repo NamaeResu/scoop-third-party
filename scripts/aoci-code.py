@@ -10,7 +10,11 @@ take the sha256 from SHA256SUMS (or compute it) -> rewrite version, url and hash
 Usage:
     python3 scripts/aoci-code.py                 # check and write
     python3 scripts/aoci-code.py --dry-run       # report only
-    python3 scripts/aoci-code.py --token $GH_TOKEN
+    python3 scripts/aoci-code.py --token <pat>   # optional, raises the GitHub API limit
+
+The script reads no environment variables and knows nothing about the CI platform
+it runs on: the token, if any, comes in explicitly via --token, and without it the
+GitHub API is queried anonymously with the releases.atom feed as a fallback.
 """
 from __future__ import annotations
 
@@ -26,7 +30,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(ROOT, "bucket", "aoci-code.json")
 REPO = "https://github.com/aoci-spec/aoci-code"
-UA = "scoop-third-party-updater/1.0 (+https://gitcode.com/NamaeResu/scoop-third-party)"
+UA = "scoop-third-party-updater/1.0"
 TOKEN = ""
 
 
@@ -239,7 +243,7 @@ def main() -> int:
     global TOKEN
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--token", default=os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN") or "")
+    ap.add_argument("--token", default="")
     args = ap.parse_args()
     TOKEN = args.token
 
