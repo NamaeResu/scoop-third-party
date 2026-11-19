@@ -1,0 +1,27 @@
+{
+    "version": "0.0.0",
+    "description": "",
+    "homepage": "",
+    "license": {
+        "identifier": "Freeware",
+        "url": ""
+    },
+    "architecture": {
+        "64bit": {
+            "url": "",
+            "hash": ""
+        }
+    },
+    "bin": "",
+    "shortcuts": [],
+    "checkver": {
+        "github": "https://github.com/<owner>/<repo>"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": ""
+            }
+        }
+    }
+}
