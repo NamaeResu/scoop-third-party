@@ -20,7 +20,7 @@
     "bin": "aoci.exe",
     "checkver": {
         "url": "https://github.com/aoci-spec/aoci-code/releases.atom",
-        "regex": "v([\d.]+(?:-[a-z]+\d+)?)</title>"
+        "regex": "v([\\d.]+(?:-[a-z]+\\d+)?)</title>"
     },
     "autoupdate": {
         "architecture": {
